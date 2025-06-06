@@ -5,7 +5,7 @@ using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace EfCoreOwnedEntityParentMoveTests
+namespace EfCoreOwnedEntityParentMoveTestsSimple
 {
     public class Parent
     {
@@ -39,26 +39,31 @@ namespace EfCoreOwnedEntityParentMoveTests
         }
     }
 
-    public class OwnedEntityParentMovementTests : IDisposable
+    public class OwnedEntityParentMovementTests
     {
-        private readonly TestDbContext _context;
         private readonly ITestOutputHelper _output;
 
         public OwnedEntityParentMovementTests(ITestOutputHelper output)
         {
             _output = output;
-            var options = new DbContextOptionsBuilder<TestDbContext>()
-                .UseSqlite($"Data Source={Guid.NewGuid()}.db")
-                .EnableSensitiveDataLogging()
-                .Options;
+        }
 
-            _context = new TestDbContext(options);
-            _context.Database.EnsureCreated();
+        private static TestDbContext CreateContext()
+        {
+            var optionsBuilder = new DbContextOptionsBuilder<TestDbContext>();
+            optionsBuilder.UseSqlite($"Data Source={Guid.NewGuid()}.db");
+            optionsBuilder.EnableSensitiveDataLogging();
+            var context = new TestDbContext(optionsBuilder.Options);
+            context.Database.EnsureCreated();
+            return context;
         }
 
         [Fact]
         public void Moving_Entity_Between_Parents_Should_Preserve_OwnedData()
         {
+            using var context = CreateContext();
+            _output.WriteLine("Testing with SQLite");
+
             // Arrange
             var parent1 = new Parent();
             var parent2 = new Parent();
@@ -70,17 +75,17 @@ namespace EfCoreOwnedEntityParentMoveTests
 
             parent1.Entities.Add(entity);
 
-            _context.Parents.Add(parent1);
-            _context.Parents.Add(parent2);
+            context.Parents.Add(parent1);
+            context.Parents.Add(parent2);
 
-            _context.SaveChanges();
+            context.SaveChanges();
 
             Assert.NotNull(entity.Data);
 
             parent1.Entities.Remove(entity);
             parent2.Entities.Add(entity);
 
-            _context.SaveChanges();
+            context.SaveChanges();
 
             Assert.Equal(1, parent2.Entities.Count);
 
@@ -89,11 +94,6 @@ namespace EfCoreOwnedEntityParentMoveTests
 
             // ... but owned data is null
             Assert.NotNull(entity.Data);
-        }
-
-        public void Dispose()
-        {
-            _context?.Dispose();
         }
     }
 }
